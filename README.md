@@ -10,7 +10,7 @@ Unofficial Bot EngDis API.
 ## How to use ?
 โคลนโปรเจคนี้ไปเลยยค้าบวัยรุ่นนนนน
 
-``` git clone https://github.com/BossNz/auto-engdis ```
+``` git clone https://github.com/DeltaLoam/auto-english-discovery.git ```
 
 แล้วก็ลง package ทั้งหมดก่อน
 โดยใช้คำสั่ง
