@@ -4,8 +4,8 @@ import PromptSync from "prompt-sync";
 import EngDis from "./lib/engdis.lib.js";
 
 const prompt = PromptSync({ sigint: true });
-const baseUrlFe1 = "https://edservices.engdis.com/api/";
-const baseUrlFe2 = "https://eduiwebservices20.engdis.com/api/";
+const baseUrl = "https://edwebservices2.engdis.com/api/";
+const cannonicalDomain = "ed22.engdis.com/thai";
 class Main {
   setting = {
     baseUrl: "",
@@ -35,7 +35,7 @@ class Main {
   async welcome() {
     console.log(figlet.textSync("English Discoveries."));
     console.log(
-      "[!] Bot for student kmitl only!, latest update at 27/01/23.\n"
+      "[!] Bot for student kmitl only!, updated for 2026 portal.\n"
     );
   }
 
@@ -47,12 +47,9 @@ class Main {
   }
 
   async getInput() {
-    this.setting.baseUrl =
-      (await prompt("[?] choose your subject ( fe1 or fe2 ) : ")) == "fe1"
-        ? baseUrlFe1
-        : baseUrlFe2;
+    await prompt("[?] choose your subject ( fe1 or fe2 ) : ");
+    this.setting.baseUrl = baseUrl;
     this.setting.username = await prompt("[?] enter your studentID  : ");
-    this.setting.baseUrl = baseUrlFe2
     // this.setting.username = "65050368"
     this.setting.password = this.setting.username.slice(-5);
     console.log();
@@ -63,7 +60,10 @@ class Main {
     console.log("[*] waiting...");
     let result = await engdis.Login(
       this.setting.username,
-      this.setting.password
+      this.setting.password,
+      "5232957",
+      "136",
+      cannonicalDomain
     );
     if (!result.UserInfo) {
       console.log("[!] username or password is incorrect.");
@@ -136,25 +136,25 @@ class Main {
         course.ParentNodeId
       );
       
-      await courseTree.data.map(async (item) => {
+      for (const item of courseTree.data) {
         console.log(`\n[*] checking ( ${item.Name} )`);
 
-        await item.Children.map(async (elem) => {
+        for (const elem of item.Children) {
           if (elem.Name != "Test") {
             console.log(`[#] checking ${elem.Name}`);
 
-            elem.Children.map(async (ele) => {
+            for (const ele of elem.Children) {
               await this.engdis.setSucessTask(
                 course.ParentNodeId,
                 ele.NodeId
               );
-            });
+            }
           } else {
             console.log(`[#] checking ${elem.Name}`)
             await this.setTest100Percent(item["Metadata"]["Code"], item["NodeId"], item["ParentNodeId"])
           }
-        });
-      });
+        }
+      }
 
       // for (const item of courseTree["data"]) {
       //   console.log(`\n[*] checking ( ${item.Name} )`);
@@ -181,21 +181,35 @@ class Main {
 
   async setTest100Percent(code, nodeId, parentNodeId) {
     const testData = await this.engdis.getTestCodeDigit(code)
+    if (!testData || !Array.isArray(testData.tasks)) {
+      console.log(`[!] can't load lesson data for ${code}`);
+      return;
+    }
+
     var submitAnswer = [];
 
     for (var data of testData["tasks"]) {
       const id = data["id"]
       const code = data["code"]
       const type = data["type"]
-      const testAnswerData = await this.engdis.practiceGetItem(code)
+      const testAnswerData = await this.engdis.practiceGetItem(
+        id,
+        code,
+        type
+      )
+      const questions = testAnswerData?.data?.i?.q
+      if (!Array.isArray(questions)) {
+        console.log(`[!] can't load practice data for ${code}`)
+        continue
+      }
 
-      if (testAnswerData["data"]["i"]["q"].length > 1) {
-        for (var i = 1; i < testAnswerData["data"]["i"]["q"].length; i++) {
-          testAnswerData["data"]["i"]["q"][0]["al"] = testAnswerData["data"]["i"]["q"][0]["al"].concat(testAnswerData["data"]["i"]["q"][i]["al"])
+      if (questions.length > 1) {
+        for (var i = 1; i < questions.length; i++) {
+          questions[0]["al"] = questions[0]["al"].concat(questions[i]["al"])
         }
       }
 
-      const correctAnswerList = testAnswerData["data"]["i"]["q"][0]["al"]
+      const correctAnswerList = questions[0]["al"]
 
       if (correctAnswerList.length == 0) continue
       const foundC = correctAnswerList[0]["a"].filter(item => item["c"] == "1")
