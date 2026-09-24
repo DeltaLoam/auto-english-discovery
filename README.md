@@ -1,4 +1,6 @@
 # Auto EngDis
+thankyou  BossNz
+updated version for 2026
 Unofficial Bot EngDis API.
 
 บอทสำหรับชาววัยรุ่น KMITL สำหรับวิชา FE1 และ FE2 ค้าบ
