@@ -1,5 +1,6 @@
 import clipboardy from 'clipboardy';
 import figlet from "figlet";
+import { selectCorrectAnswers } from "./lib/test-parser.js";
 import PromptSync from "prompt-sync";
 import EngDis from "./lib/engdis.lib.js";
 
@@ -203,53 +204,22 @@ class Main {
         continue
       }
 
-      if (questions.length > 1) {
-        for (var i = 1; i < questions.length; i++) {
-          questions[0]["al"] = questions[0]["al"].concat(questions[i]["al"])
-        }
+      let answerUa;
+      try {
+        answerUa = selectCorrectAnswers(questions);
+      } catch (error) {
+        console.log(`[!] invalid practice data for ${code}: ${error.message}`);
+        continue;
       }
 
-      const correctAnswerList = questions[0]["al"]
+      if (answerUa.length === 0) continue;
 
-      if (correctAnswerList.length == 0) continue
-      const foundC = correctAnswerList[0]["a"].filter(item => item["c"] == "1")
-
-      if (foundC.length != 0) {
-        const answerUa = correctAnswerList.map(obj => [obj.id, obj.a.find(answer => answer.c === '1').id]);
-        
-        submitAnswer.push({
-          "iId"	:	id,
-          "iCode"	:	code,
-          "iType"	: type,
-          "ua": [
-            {
-                "qId": 1,
-                "aId": answerUa
-            }
-          ]
-        })
-      } else {
-        var uaList = [];
-
-        for (const ans of correctAnswerList) {
-          uaList.push(              {
-            "qId": "1",
-            "aId": [
-                [
-                    ans["id"],
-                    ans["a"][0]["id"]
-                ]
-            ]
-          })
-        }
-
-        submitAnswer.push({
-          "iId": id,
-          "iCode": code,
-          "iType": type,
-          "ua": uaList
-        })
-      }
+      submitAnswer.push({
+        iId: id,
+        iCode: code,
+        iType: type,
+        ua: [{ qId: 1, aId: answerUa }],
+      });
     }
 
     const testStatus = await this.engdis.SaveUserTestV1(nodeId, parentNodeId, submitAnswer)
