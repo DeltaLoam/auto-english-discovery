@@ -1,6 +1,9 @@
 import clipboardy from 'clipboardy';
 import figlet from "figlet";
-import { buildTaskSubmission } from "./lib/test-parser.js";
+import {
+  buildTaskCandidates,
+  buildTaskSubmission,
+} from "./lib/test-parser.js";
 import { createPrompt } from "./lib/cli-input.js";
 import EngDis from "./lib/engdis.lib.js";
 
@@ -14,6 +17,7 @@ class Main {
     password: "",
   };
   engdis = new EngDis();
+  answerCache = new Map();
 
   constructor() {
     this.welcome();
@@ -203,13 +207,11 @@ class Main {
     }
 
     const submitAnswer = [];
+    const practiceByCode = new Map();
 
     for (const task of testData.tasks) {
-      const practiceItem = await this.engdis.practiceGetItem(
-        task.id,
-        task.code,
-        task.type
-      );
+      const practiceItem = await this.engdis.practiceGetItem(task.id, task.code, task.type);
+      practiceByCode.set(task.code, practiceItem?.data);
 
       let submission;
       try {
@@ -222,27 +224,53 @@ class Main {
         continue;
       }
 
-      if (!submission) {
-        console.log(`[!] can't load practice data for ${task.code}`);
+      if (submission) submitAnswer.push(submission);
+    }
+
+    const initial = await this.engdis.SaveUserTestV1(nodeId, parentNodeId, submitAnswer);
+    if (initial?.data?.finalMark === 100 || initial?.data?.finalMark === "100") {
+      console.log(initial.data.finalMark);
+      return initial.data.finalMark;
+    }
+
+    for (const task of testData.tasks) {
+      const current = submitAnswer.find((item) => item.iId === task.id);
+      if (!current) continue;
+
+      const mark = initial?.data?.marks?.find((item) => item.iId === task.id)?.m;
+      if (Number(mark) === 100) continue;
+
+      const cached = this.answerCache.get(task.code);
+      if (cached) {
+        submitAnswer.splice(submitAnswer.indexOf(current), 1, cached);
         continue;
       }
 
-      submitAnswer.push(submission);
+      const candidates = buildTaskCandidates(task, practiceByCode.get(task.code), 10000);
+      if (candidates.length === 0) continue;
+      console.log(`[#] searching ${task.code}: ${candidates.length} candidates`);
+
+      let found = false;
+      for (const candidate of candidates) {
+        const attempt = submitAnswer.map((item) => item.iId === task.id ? candidate : item);
+        const result = await this.engdis.SaveUserTestV1(nodeId, parentNodeId, attempt);
+        const taskMark = result?.data?.marks?.find((item) => item.iId === task.id)?.m;
+        if (Number(taskMark) === 100) {
+          submitAnswer.splice(submitAnswer.indexOf(current), 1, candidate);
+          this.answerCache.set(task.code, candidate);
+          found = true;
+          console.log(`[#] solved ${task.code}`);
+          break;
+        }
+      }
+      if (!found) console.log(`[!] no candidate passed ${task.code}`);
     }
 
-    const testStatus = await this.engdis.SaveUserTestV1(
-      nodeId,
-      parentNodeId,
-      submitAnswer
-    );
+    const testStatus = await this.engdis.SaveUserTestV1(nodeId, parentNodeId, submitAnswer);
     const finalMark = testStatus?.data?.finalMark;
     console.log(finalMark);
 
-    if (finalMark != "100") {
-      clipboardy.writeSync(JSON.stringify(submitAnswer));
-      console.log(finalMark);
-    }
-
+    if (finalMark != "100") clipboardy.writeSync(JSON.stringify(submitAnswer));
     return finalMark;
   }
 }

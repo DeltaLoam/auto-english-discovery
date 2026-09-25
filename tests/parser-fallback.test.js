@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
-import { buildTaskSubmission } from "../lib/test-parser.js";
+import {
+  buildTaskCandidates,
+  buildTaskSubmission,
+} from "../lib/test-parser.js";
 
 const task = { id: 7, code: "fallback-task", type: 23 };
 const practice = {
@@ -28,4 +31,10 @@ assert.deepEqual(submission, {
     { qId: "1", aId: [[2, 21]] },
   ],
 });
-console.log("parser-fallback: synthetic fallback validated");
+const candidates = buildTaskCandidates(task, practice, 10000);
+assert.equal(candidates.length, 3);
+assert.deepEqual(candidates[0].ua, [
+  { qId: "1", aId: [[1, 11]] },
+  { qId: "1", aId: [[2, 21]] },
+]);
+console.log("parser-fallback: synthetic fallback and candidate search validated");
