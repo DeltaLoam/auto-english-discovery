@@ -1,8 +1,9 @@
 import clipboardy from 'clipboardy';
 import figlet from "figlet";
 import {
-  buildTaskCandidates,
+  iterateTaskCandidates,
   buildTaskSubmission,
+  getTaskScore,
 } from "./lib/test-parser.js";
 import { createPrompt } from "./lib/cli-input.js";
 import EngDis from "./lib/engdis.lib.js";
@@ -237,8 +238,8 @@ class Main {
       const current = submitAnswer.find((item) => item.iId === task.id);
       if (!current) continue;
 
-      const mark = initial?.data?.marks?.find((item) => item.iId === task.id)?.m;
-      if (Number(mark) === 100) continue;
+      const mark = getTaskScore(initial, task.id);
+      if (mark === 100) continue;
 
       const cached = this.answerCache.get(task.code);
       if (cached) {
@@ -246,24 +247,22 @@ class Main {
         continue;
       }
 
-      const candidates = buildTaskCandidates(task, practiceByCode.get(task.code), 10000);
-      if (candidates.length === 0) continue;
-      console.log(`[#] searching ${task.code}: ${candidates.length} candidates`);
-
       let found = false;
-      for (const candidate of candidates) {
+      let attempts = 0;
+      for (const candidate of iterateTaskCandidates(task, practiceByCode.get(task.code))) {
+        attempts += 1;
         const attempt = submitAnswer.map((item) => item.iId === task.id ? candidate : item);
         const result = await this.engdis.SaveUserTestV1(nodeId, parentNodeId, attempt);
-        const taskMark = result?.data?.marks?.find((item) => item.iId === task.id)?.m;
-        if (Number(taskMark) === 100) {
+        const taskMark = getTaskScore(result, task.id);
+        if (taskMark === 100) {
           submitAnswer.splice(submitAnswer.indexOf(current), 1, candidate);
           this.answerCache.set(task.code, candidate);
           found = true;
-          console.log(`[#] solved ${task.code}`);
+          console.log(`[#] solved ${task.code} after ${attempts} candidates`);
           break;
         }
       }
-      if (!found) console.log(`[!] no candidate passed ${task.code}`);
+      if (!found) console.log(`[!] no candidate passed ${task.code} after ${attempts} candidates`);
     }
 
     const testStatus = await this.engdis.SaveUserTestV1(nodeId, parentNodeId, submitAnswer);
