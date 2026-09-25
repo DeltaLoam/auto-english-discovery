@@ -24,11 +24,30 @@ class Main {
     const loginToken = await this.login();
     if (!loginToken) process.exit();
     this.engdis = new EngDis(this.setting.baseUrl, loginToken.UserInfo.Token);
-    let courses = await this.selectCourse();
-    await this.setTaskSuccess(courses);
+    const courses = await this.selectCourse();
+    const maxPasses = 3;
+    let previousScore = "";
 
-    const progress = await this.engdis.getProgress();
-    console.log("Progress:", progress[0], "Grade:", progress[1])
+    for (let pass = 1; pass <= maxPasses; pass++) {
+      console.log(`\n[*] pass ${pass}/${maxPasses}: unfinished lessons only`);
+      await this.setTaskSuccess(courses, true);
+
+      const progress = await this.engdis.getProgress();
+      if (!Array.isArray(progress)) {
+        console.log("[!] can't read progress");
+        break;
+      }
+
+      console.log("Progress:", progress[0], "Grade:", progress[1]);
+      if (Number(progress[0]) === 100 && Number(progress[1]) === 100) break;
+
+      const score = `${progress[0]}:${progress[1]}`;
+      if (score === previousScore) {
+        console.log("[!] score unchanged; stopping retries");
+        break;
+      }
+      previousScore = score;
+    }
 
     // await this.logout();
   }
@@ -130,7 +149,7 @@ class Main {
     return courseTmp;
   }
 
-  async setTaskSuccess(courses) {
+  async setTaskSuccess(courses, skipCompleted = false) {
     for (let course of courses) {
       var courseTree = await this.engdis.getCourseTree(
         course.NodeId,
@@ -145,6 +164,12 @@ class Main {
       for (const item of courseTree.data) {
         console.log(`\n[*] checking ( ${item.Name} )`);
         const subItems = Array.isArray(item.Children) ? item.Children : [];
+        const testItem = subItems.find((child) => child.Name === "Test");
+
+        if (skipCompleted && Number(testItem?.Grade) === 100) {
+          console.log(`[#] skip completed lesson (${item.Name})`);
+          continue;
+        }
 
         for (const elem of subItems) {
           if (elem.Name != "Test") {
@@ -216,6 +241,8 @@ class Main {
       clipboardy.writeSync(JSON.stringify(submitAnswer));
       console.log(finalMark);
     }
+
+    return finalMark;
   }
 }
 
