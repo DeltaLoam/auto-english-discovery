@@ -215,6 +215,7 @@ class Main {
       try {
         submission = buildTaskSubmission(task, practiceItem?.data, {
           allowFirstAnswerFallback: true,
+          includeAllFallbackAnswers: true,
         });
       } catch (error) {
         console.log(`[!] invalid practice data for ${task.code}: ${error.message}`);
