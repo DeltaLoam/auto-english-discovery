@@ -1,7 +1,10 @@
 {
   "type": "module",
   "scripts": {
-    "test:parser": "node tests/parser-dry-run.test.js"
+    "test:parser": "node tests/parser-dry-run.test.js",
+    "test:cli-input": "node tests/cli-input.test.js",
+    "test:parser-fallback": "node tests/parser-fallback.test.js",
+    "test:parser-all": "node tests/parser-all-fixtures.test.js"
   },
   "dependencies": {
     "axios": "^1.20.0",

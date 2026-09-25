@@ -1,10 +1,10 @@
 import clipboardy from 'clipboardy';
 import figlet from "figlet";
-import { selectCorrectAnswers } from "./lib/test-parser.js";
-import PromptSync from "prompt-sync";
+import { buildTaskSubmission } from "./lib/test-parser.js";
+import { createPrompt } from "./lib/cli-input.js";
 import EngDis from "./lib/engdis.lib.js";
 
-const prompt = PromptSync({ sigint: true });
+const prompt = createPrompt();
 const baseUrl = "https://edwebservices2.engdis.com/api/";
 const cannonicalDomain = "ed22.engdis.com/thai";
 class Main {
@@ -136,103 +136,94 @@ class Main {
         course.NodeId,
         course.ParentNodeId
       );
-      
+
+      if (!courseTree?.isSuccess || !Array.isArray(courseTree?.data)) {
+        console.log(`[!] can't load course tree for node ${course.NodeId}`);
+        continue;
+      }
+
       for (const item of courseTree.data) {
         console.log(`\n[*] checking ( ${item.Name} )`);
+        const subItems = Array.isArray(item.Children) ? item.Children : [];
 
-        for (const elem of item.Children) {
+        for (const elem of subItems) {
           if (elem.Name != "Test") {
             console.log(`[#] checking ${elem.Name}`);
+            const tasks = Array.isArray(elem.Children) ? elem.Children : [];
 
-            for (const ele of elem.Children) {
+            for (const ele of tasks) {
               await this.engdis.setSucessTask(
                 course.ParentNodeId,
                 ele.NodeId
               );
             }
           } else {
-            console.log(`[#] checking ${elem.Name}`)
-            await this.setTest100Percent(item["Metadata"]["Code"], item["NodeId"], item["ParentNodeId"])
+            console.log(`[#] checking ${elem.Name}`);
+            if (!item?.Metadata?.Code) {
+              console.log(`[!] missing lesson code for ${item.Name}`);
+              continue;
+            }
+            await this.setTest100Percent(item.Metadata.Code, item.NodeId, item.ParentNodeId);
           }
         }
       }
-
-      // for (const item of courseTree["data"]) {
-      //   console.log(`\n[*] checking ( ${item.Name} )`);
-
-      //   for (const elem of item["Children"]) {
-      //     if (elem.Name != "Test") {
-      //       console.log(`[#] checking ${elem.Name}`);
-
-      //       for (const ele of elem["Children"]) {
-      //         await this.engdis.setSucessTask(
-      //           course.ParentNodeId,
-      //           ele.NodeId
-      //         );
-      //       }
-      //     } else {
-      //       console.log(`[#] checking ${elem.Name}`)
-      //       await this.setTest100Percent(item["Metadata"]["Code"], item["NodeId"], item["ParentNodeId"])
-      //     }
-      //   }
-      // }
-
     }
   }
 
   async setTest100Percent(code, nodeId, parentNodeId) {
-    const testData = await this.engdis.getTestCodeDigit(code)
+    const testData = await this.engdis.getTestCodeDigit(code);
     if (!testData || !Array.isArray(testData.tasks)) {
       console.log(`[!] can't load lesson data for ${code}`);
       return;
     }
 
-    var submitAnswer = [];
+    const submitAnswer = [];
 
-    for (var data of testData["tasks"]) {
-      const id = data["id"]
-      const code = data["code"]
-      const type = data["type"]
-      const testAnswerData = await this.engdis.practiceGetItem(
-        id,
-        code,
-        type
-      )
-      const questions = testAnswerData?.data?.i?.q
-      if (!Array.isArray(questions)) {
-        console.log(`[!] can't load practice data for ${code}`)
-        continue
-      }
+    for (const task of testData.tasks) {
+      const practiceItem = await this.engdis.practiceGetItem(
+        task.id,
+        task.code,
+        task.type
+      );
 
-      let answerUa;
+      let submission;
       try {
-        answerUa = selectCorrectAnswers(questions);
+        submission = buildTaskSubmission(task, practiceItem?.data, {
+          allowFirstAnswerFallback: true,
+        });
       } catch (error) {
-        console.log(`[!] invalid practice data for ${code}: ${error.message}`);
+        console.log(`[!] invalid practice data for ${task.code}: ${error.message}`);
         continue;
       }
 
-      if (answerUa.length === 0) continue;
+      if (!submission) {
+        console.log(`[!] can't load practice data for ${task.code}`);
+        continue;
+      }
 
-      submitAnswer.push({
-        iId: id,
-        iCode: code,
-        iType: type,
-        ua: [{ qId: 1, aId: answerUa }],
-      });
+      submitAnswer.push(submission);
     }
 
-    const testStatus = await this.engdis.SaveUserTestV1(nodeId, parentNodeId, submitAnswer)
-    console.log(testStatus["data"]["finalMark"])
+    const testStatus = await this.engdis.SaveUserTestV1(
+      nodeId,
+      parentNodeId,
+      submitAnswer
+    );
+    const finalMark = testStatus?.data?.finalMark;
+    console.log(finalMark);
 
-    if (testStatus["data"]["finalMark"] != "100") {
-      clipboardy.writeSync(JSON.stringify(submitAnswer))
-      console.log(testStatus["data"]["finalMark"])
+    if (finalMark != "100") {
+      clipboardy.writeSync(JSON.stringify(submitAnswer));
+      console.log(finalMark);
     }
   }
 }
 
 (async () => {
   const mainClass = new Main();
-  mainClass.main();
+  try {
+    await mainClass.main();
+  } finally {
+    prompt.close();
+  }
 })();

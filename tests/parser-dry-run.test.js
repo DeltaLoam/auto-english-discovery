@@ -25,11 +25,14 @@ for (const name of ["recycling", "movie-making"]) {
     assert.ok(submission.iId);
     assert.ok(submission.iCode);
     assert.notEqual(submission.iType, undefined);
-    assert.equal(submission.ua.length, 1);
-    assert.ok(submission.ua[0].aId.length > 0);
-    for (const [questionId, answerId] of submission.ua[0].aId) {
-      assert.ok(questionId);
-      assert.ok(answerId);
+    assert.ok(submission.ua.length > 0);
+    for (const question of submission.ua) {
+      assert.ok(question.qId);
+      assert.ok(question.aId.length > 0);
+      for (const [questionId, answerId] of question.aId) {
+        assert.ok(questionId);
+        assert.ok(answerId);
+      }
     }
   }
 
