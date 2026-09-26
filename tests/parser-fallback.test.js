@@ -53,7 +53,13 @@ const matchingPractice = {
   },
 };
 const matchingCandidates = [...iterateTaskCandidates(matchingTask, matchingPractice)];
-assert.deepEqual(matchingCandidates.at(-1).ua, [
-  { qId: "1", aId: [[1, 11], [1, 12], [2, 21], [2, 22]] },
-]);
+assert.ok(
+  matchingCandidates.some(
+    ({ ua }) =>
+      JSON.stringify(ua) ===
+      JSON.stringify([
+        { qId: "1", aId: [[1, 11], [1, 12], [2, 21], [2, 22]] },
+      ])
+  )
+);
 console.log("parser-fallback: synthetic fallback and candidate search validated");

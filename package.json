@@ -1,6 +1,7 @@
 {
   "type": "module",
   "scripts": {
+    "test": "npm run test:parser && npm run test:parser-fallback && npm run test:parser-all && npm run test:cli-input",
     "test:parser": "node tests/parser-dry-run.test.js",
     "test:cli-input": "node tests/cli-input.test.js",
     "test:parser-fallback": "node tests/parser-fallback.test.js",
